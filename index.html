@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地震防災小英雄 Earthquake Safety Hero</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+TC:wght@700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+        :root {
+            --mario-blue: #5c94fc;
+            --mario-red: #e52521;
+            --mario-green: #008f00;
+            --mario-ground: #c84c0c;
+        }
+
+        body {
+            background-color: var(--mario-blue);
+            font-family: 'Noto Sans TC', sans-serif;
+            color: white;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+            overflow-x: hidden;
+            user-select: none;
+        }
+
+        .pixel-text {
+            font-family: 'Press Start 2P', cursive;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: rgba(0, 0, 0, 0.6);
+            padding: 30px;
+            border: 4px solid #fff;
+            border-radius: 10px;
+            box-shadow: 0 0 0 4px #000;
+            position: relative;
+        }
+
+        /* 答錯時的震動效果 */
+        @keyframes shake {
+            0% { transform: translate(2px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(0px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(2px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(2px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .shake-active {
+            animation: shake 0.5s;
+            animation-iteration-count: 1;
+        }
+
+        h1 {
+            color: #fbd000;
+            font-size: 28px;
+            margin-bottom: 5px;
+            text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
+        }
+
+        .en-title {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            margin-bottom: 30px;
+            color: #fff;
+        }
+
+        .info-box {
+            background-color: var(--mario-ground);
+            border: 4px solid #000;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 18px;
+            line-height: 1.8;
+        }
+
+        .btn {
+            background-color: var(--mario-red);
+            color: white;
+            border: 4px solid #000;
+            padding: 15px 30px;
+            font-size: 20px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            transition: transform 0.1s;
+            margin: 10px;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            background-color: #ff3b37;
+        }
+
+        .btn-green {
+            background-color: var(--mario-green);
+        }
+
+        .btn-green:hover {
+            background-color: #00b300;
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .active {
+            display: block;
+        }
+
+        /* 遊戲介面元素 */
+        .hud {
+            display: flex;
+            justify-content: space-between;
+            font-size: 20px;
+            margin-bottom: 20px;
+            border-bottom: 4px dashed #fff;
+            padding-bottom: 10px;
+        }
+
+        .question-box {
+            font-size: 24px;
+            margin: 30px 0;
+            line-height: 1.5;
+        }
+
+        .question-en {
+            font-size: 18px;
+            color: #fbd000;
+            margin-top: 10px;
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+
+        .option-btn {
+            background-color: #fff;
+            color: #000;
+            border: 4px solid #000;
+            padding: 15px;
+            font-size: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            border-radius: 8px;
+            box-shadow: 4px 4px 0px #000;
+            transition: all 0.1s;
+        }
+
+        .option-btn:hover {
+            background-color: #f0f0f0;
+            transform: translate(-2px, -2px);
+            box-shadow: 6px 6px 0px #000;
+        }
+
+        .option-en {
+            font-size: 14px;
+            color: #555;
+            margin-top: 5px;
+        }
+
+        /* 金幣掉落特效: 從最上方開始掉落 */
+        .coin {
+            position: fixed;
+            width: 30px;
+            height: 40px;
+            background-color: #fbd000;
+            border: 4px solid #000;
+            border-radius: 50%;
+            z-index: 999;
+            pointer-events: none;
+            animation: fall linear forwards;
+        }
+
+        @keyframes fall {
+            0% { transform: translateY(0) rotateY(0deg); opacity: 1; }
+            100% { transform: translateY(110vh) rotateY(720deg); opacity: 0; }
+        }
+
+        /* 答題反饋面板樣式 */
+        #feedback-panel {
+            display: none; 
+            background-color: rgba(255, 255, 255, 0.9);
+            color: #000;
+            border: 4px solid #000;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        .feedback-panel.correct {
+            border-color: var(--mario-green);
+        }
+
+        .feedback-panel.incorrect {
+            border-color: var(--mario-red);
+        }
+
+        #explanation-text {
+            font-size: 16px;
+            margin-top: 10px;
+            line-height: 1.6;
+        }
+
+        /* 證書樣式 */
+        #certificate {
+            background-color: #fff;
+            color: #000;
+            border: 10px solid var(--mario-red);
+            padding: 40px;
+            margin: 20px auto;
+            width: 80%;
+            position: relative;
+            outline: 4px solid #000;
+            outline-offset: -14px;
+        }
+
+        .cert-title {
+            color: var(--mario-red);
+            font-size: 32px;
+            margin-bottom: 20px;
+        }
+
+        .cert-stamp {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 80px;
+            height: 80px;
+            background-color: gold;
+            border-radius: 50%;
+            border: 4px dashed #da8508;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            transform: rotate(-15deg);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container" class="container">
+
+        <div id="screen-start" class="screen active">
+            <h1>地震防災小英雄</h1>
+            <div class="en-title">Earthquake Safety Hero</div>
+            
+            <div class="info-box">
+                <p>⚠️ 遊戲說明 (Game Rules):</p>
+                <p>總共有 <b>10</b> 題挑戰，每題 <b>10</b> 分<br>10 questions, 10 points each.</p>
+                <p>答題後會顯示<b>正確答案</b>和<b>防災說明</b>喔！<br>Correct answer & explanation after each.</p>
+                <p>達到 <b>80分</b> 以上即可獲得專屬合格證書！<br>Score 80+ to get a certificate!</p>
+            </div>
+
+            <button class="btn btn-green" onclick="startGame()">開始挑戰 START!</button>
+        </div>
+
+        <div id="screen-game" class="screen">
+            <div class="hud pixel-text">
+                <div id="score-display">SCORE:000</div>
+                <div id="question-count">Q:1/10</div>
+            </div>
+
+            <div class="question-box">
+                <div id="q-zh">問題中文載入中...</div>
+                <div id="q-en" class="question-en">Loading...</div>
+            </div>
+
+            <div id="options-container" class="options-grid">
+                </div>
+
+            <div id="feedback-panel"></div>
+            <button id="next-btn" class="btn btn-green" style="display: none; margin-top: 15px;" onclick="nextQuestion()">下一題 (Next)</button>
+        </div>
+
+        <div id="screen-end" class="screen">
+            <h1>挑戰結束！ Game Over!</h1>
+            
+            <div class="info-box" style="font-size: 24px;">
+                <p>你的總分 Your Score: <span id="final-score" class="pixel-text" style="color: #fbd000;"></span></p>
+                <p id="feedback-msg"></p>
+                <p id="feedback-msg-en" style="font-size: 16px; color: #ddd;"></p>
+            </div>
+
+            <div id="cert-area" style="display: none;">
+                <div id="certificate">
+                    <h2 class="cert-title">合格證書<br>Certificate of Completion</h2>
+                    <p>特此證明 This certifies that</p>
+                    <h3 style="font-size: 28px; color: var(--mario-blue);">防災小英雄 Safety Hero</h3>
+                    <p>已成功完成地震防災教育測驗</p>
+                    <p>Has successfully completed the Earthquake Safety Training.</p>
+                    <div style="margin-top: 30px; font-size: 20px; font-weight: bold;">
+                        得分 Score: <span id="cert-score"></span> / 100
+                    </div>
+                    <div class="cert-stamp">EXPERT</div>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-green" onclick="downloadImage()">下載圖片 (Download JPEG)</button>
+                    <button class="btn btn-green" onclick="downloadPDF()">下載PDF (Download PDF)</button>
+                </div>
+            </div>
+
+            <button class="btn" style="margin-top: 20px;" onclick="resetGame()">再玩一次 Play Again</button>
+        </div>
+
+    </div>
+
+    <script>
+        // 題庫資料
+        const quizData = [
+            {
+                q_zh: "地震發生搖晃時，我們應該先做什麼最重要的三個動作？",
+                q_en: "What are the three most important steps to take during an earthquake?",
+                options: [
+                    { zh: "大聲尖叫並往外跑", en: "Scream and run outside", correct: false },
+                    { zh: "趴下、掩護、穩住", en: "Drop, Cover, Hold on", correct: true },
+                    { zh: "趕快去開門和關瓦斯", en: "Quickly open doors and turn off gas", correct: false }
+                ],
+                explanation: "正確答案是：趴下、掩護、穩住。這能保護你的身體免受掉落物的傷害。千萬不要急著往外跑或關瓦斯，因為這些動作會增加受傷風險。",
+                explanation_en: "Correct answer: Drop, Cover, Hold on. This protects your body from falling objects."
+            },
+            {
+                q_zh: "在教室內避難時，躲在哪裡最安全？",
+                q_en: "Where is the safest place to hide in a classroom?",
+                options: [
+                    { zh: "堅固的桌子底下", en: "Under a sturdy desk", correct: true },
+                    { zh: "大片玻璃窗戶旁邊", en: "Next to large glass windows", correct: false },
+                    { zh: "天花板電風扇正下方", en: "Directly under the ceiling fan", correct: false }
+                ],
+                explanation: "正確答案：堅固的桌子底下。躲在堅固桌子下方能防止天花板掉落物、燈具等直接砸傷你。遠離窗戶是為了避免玻璃破裂割傷。",
+                explanation_en: "Correct answer: Under a sturdy desk. Hiding under a strong desk prevents direct injury."
+            },
+            {
+                q_zh: "地震後如果需要離開建築物，可以使用電梯嗎？",
+                q_en: "Can we use the elevator to leave the building after an earthquake?",
+                options: [
+                    { zh: "可以，因為比較快", en: "Yes, because it is faster", correct: false },
+                    { zh: "不行，可能會被困住，要走樓梯", en: "No, you might get trapped. Use stairs.", correct: true }
+                ],
+                explanation: "正確答案：不行，可能會被困住。地震後可能導致停電或電梯故障，被困在電梯裡非常危險。一定要走樓梯。",
+                explanation_en: "Correct answer: No, you might get trapped. Always use the stairs after an earthquake."
+            },
+            {
+                q_zh: "地震發生時，如果你正在戶外的操場上，應該怎麼辦？",
+                q_en: "What should you do if you are on the outdoor playground during an earthquake?",
+                options: [
+                    { zh: "趕快跑回教室裡", en: "Run back into the classroom quickly", correct: false },
+                    { zh: "留在原地，蹲下並遠離建築物和籃球架", en: "Stay, drop down, and stay away from buildings", correct: true }
+                ],
+                explanation: "正確答案：留在原地，蹲下。在戶外操場，要蹲下降低重心，並盡量遠離建築物（防止磁磚掉落）、籃球架（防止倒塌）和電線桿。",
+                explanation_en: "Correct answer: Stay and drop down. Lower your center of gravity and stay away from buildings."
+            },
+            {
+                q_zh: "為了防範未然，我們家裡平時應該準備什麼東西？",
+                q_en: "What should we prepare at home for emergencies?",
+                options: [
+                    { zh: "很多電動玩具和漫畫", en: "Video games and comic books", correct: false },
+                    { zh: "緊急避難包 (水、手電筒、急救包)", en: "Emergency go-bag (Water, flashlight, first-aid)", correct: true },
+                    { zh: "一大堆冰淇淋", en: "Lots of ice cream", correct: false }
+                ],
+                explanation: "正確答案：緊急避難包。準備好包含水、手電筒和急救藥品的避難包，能在停電、停水或受傷時提供緊急幫助。",
+                explanation_en: "Correct answer: Emergency go-bag. Preparing a go-bag provides crucial help during outages."
+            },
+            {
+                q_zh: "地震搖晃停止後，我們往操場疏散時應該用什麼保護頭部？",
+                q_en: "What should we use to protect our heads while evacuating?",
+                options: [
+                    { zh: "防災頭套或書本", en: "Disaster prevention hood or a thick book", correct: true },
+                    { zh: "塑膠袋", en: "A plastic bag", correct: false },
+                    { zh: "雨傘", en: "An umbrella", correct: false }
+                ],
+                explanation: "正確答案：防災頭套或書本。在疏散時，頭部是最脆弱的部位。使用防災頭套或厚重的書本蓋在頭上，能提供基本的保護。",
+                explanation_en: "Correct answer: Disaster prevention hood or a thick book. The head is the most vulnerable during evacuation."
+            },
+            {
+                q_zh: "如果半夜睡覺時發生地震，應該怎麼做？",
+                q_en: "What should you do if an earthquake happens while you are sleeping?",
+                options: [
+                    { zh: "馬上跳下床往外衝", en: "Jump out of bed and run outside", correct: false },
+                    { zh: "留在床上，用枕頭保護頭部", en: "Stay in bed and protect your head with a pillow", correct: true }
+                ],
+                explanation: "正確答案：留在床上，用枕頭保護頭部。此時下床容易被倒塌家具砸傷或被破裂物割傷。留在床上並保護頭部是最安全的選擇。",
+                explanation_en: "Correct answer: Stay in bed and protect your head with a pillow. Getting out of bed increases the risk of injury."
+            },
+            {
+                q_zh: "如果你在海邊玩水時感覺到強烈地震，要立刻怎麼辦？",
+                q_en: "If you feel a strong earthquake at the beach, what must you do immediately?",
+                options: [
+                    { zh: "繼續玩水", en: "Keep swimming", correct: false },
+                    { zh: "趕快離開海邊，往高處避難 (防海嘯)", en: "Leave the beach and run to higher ground (Tsunami warning)", correct: true }
+                ],
+                explanation: "正確答案：趕快離開海邊，往高處避難。強烈地震後可能引發海嘯。如果你在海邊，必須立刻往內陸高處撤離，不要逗留。",
+                explanation_en: "Correct answer: Leave the beach and run to higher ground. Strong earthquakes can trigger tsunamis."
+            },
+            {
+                q_zh: "緊急避難包裡面『不需要』放哪一種物品？",
+                q_en: "Which item do you NOT need in an emergency go-bag?",
+                options: [
+                    { zh: "瓶裝水和餅乾", en: "Bottled water and crackers", correct: false },
+                    { zh: "哨子", en: "A whistle", correct: false },
+                    { zh: "玻璃做的大花瓶", en: "A large glass vase", correct: true }
+                ],
+                explanation: "正確答案：玻璃做的大花瓶。玻璃易碎，在地震時可能變成危險的碎片，且花瓶沒有實際的生存用途。避難包只應放入必需品。",
+                explanation_en: "Correct answer: A large glass vase. Glass breaks easily and can become dangerous shards."
+            },
+            {
+                q_zh: "災害發生時，我們應該聽從誰的指示行動？",
+                q_en: "Whose instructions should you follow during a disaster?",
+                options: [
+                    { zh: "老師、家長或消防員", en: "Teachers, parents, or firefighters", correct: true },
+                    { zh: "旁邊不認識的小朋友", en: "An unknown child nearby", correct: false }
+                ],
+                explanation: "正確答案：老師、家長或消防員。老師、家長和消防員都接受過防災訓練，能提供最正確和安全的引導。",
+                explanation_en: "Correct answer: Teachers, parents, or firefighters. They have received disaster training and can provide guidance."
+            }
+        ];
+
+        let currentQuestion = 0;
+        let score = 0;
+        const totalQuestions = quizData.length;
+
+        // [重大修正]: 安全初始化音效，加入 try-catch 防止瀏覽器報錯卡死
+        let audioCtx = null;
+        function initAudio() {
+            try {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass && !audioCtx) {
+                    audioCtx = new AudioContextClass();
+                }
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+            } catch (error) {
+                console.warn("音效系統初始化失敗，但不影響遊戲進行:", error);
+            }
+        }
+
+        function playCoinSound() {
+            try {
+                if (!audioCtx) return;
+                const osc = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(987.77, audioCtx.currentTime); 
+                osc.frequency.setValueAtTime(1318.51, audioCtx.currentTime + 0.1); 
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.4);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.4);
+            } catch(e) {}
+        }
+
+        function playWrongSound() {
+            try {
+                if (!audioCtx) return;
+                const osc = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                osc.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(80, audioCtx.currentTime + 0.3);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.00001, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } catch(e) {}
+        }
+
+        function createCoinShower() {
+            try {
+                for (let i = 0; i < 15; i++) {
+                    let coin = document.createElement('div');
+                    coin.className = 'coin';
+                    coin.style.left = Math.random() * 90 + 'vw';
+                    coin.style.top = '-10vh'; 
+                    coin.style.animationDuration = (Math.random() * 1 + 1) + 's';
+                    document.body.appendChild(coin);
+                    setTimeout(() => { coin.remove(); }, 2000);
+                }
+            } catch(e) {}
+        }
+
+        function triggerShake() {
+            const container = document.getElementById('game-container');
+            if(container) {
+                container.classList.remove('shake-active');
+                void container.offsetWidth; 
+                container.classList.add('shake-active');
+            }
+        }
+
+        function switchScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            const target = document.getElementById(screenId);
+            if(target) target.classList.add('active');
+        }
+
+        // [遊戲啟動核心函數]
+        function startGame() {
+            console.log("Game started! 遊戲已啟動"); // 供開發者除錯用
+            initAudio(); 
+            currentQuestion = 0;
+            score = 0;
+            updateHUD();
+            loadQuestion();
+            switchScreen('screen-game');
+        }
+
+        function updateHUD() {
+            const scoreDisplay = document.getElementById('score-display');
+            const qCount = document.getElementById('question-count');
+            if(scoreDisplay) scoreDisplay.innerText = `SCORE:${score.toString().padStart(3, '0')}`;
+            if(qCount) qCount.innerText = `Q:${currentQuestion + 1}/${totalQuestions}`;
+        }
+
+        function loadQuestion() {
+            document.getElementById('feedback-panel').style.display = 'none';
+            document.getElementById('next-btn').style.display = 'none';
+
+            const q = quizData[currentQuestion];
+            document.getElementById('q-zh').innerText = q.q_zh;
+            document.getElementById('q-en').innerText = q.q_en;
+
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = '';
+
+            let shuffledOptions = [...q.options].sort(() => Math.random() - 0.5);
+
+            shuffledOptions.forEach((opt) => {
+                let btn = document.createElement('button');
+                btn.className = 'option-btn';
+                btn.innerHTML = `<div>${opt.zh}</div><div class="option-en">${opt.en}</div>`;
+                btn.onclick = () => checkAnswer(opt.correct);
+                optionsContainer.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(isCorrect) {
+            const btns = document.querySelectorAll('.option-btn');
+            btns.forEach(b => b.style.pointerEvents = 'none');
+
+            if (isCorrect) {
+                score += 10;
+                playCoinSound();
+                createCoinShower();
+            } else {
+                playWrongSound();
+                triggerShake();
+            }
+            updateHUD();
+
+            const feedbackPanel = document.getElementById('feedback-panel');
+            
+            // 安全取得正確答案文本
+            const correctOpt = quizData[currentQuestion].options.find(opt => opt.correct);
+            const correctAnswerTextZh = correctOpt ? correctOpt.zh : "";
+            const correctAnswerTextEn = correctOpt ? correctOpt.en : "";
+            
+            const explanationTextZh = quizData[currentQuestion].explanation;
+            const explanationTextEn = quizData[currentQuestion].explanation_en;
+
+            feedbackPanel.classList.remove('correct', 'incorrect');
+            feedbackPanel.classList.add(isCorrect ? 'correct' : 'incorrect');
+
+            let feedbackHtml = '';
+            if(isCorrect) {
+                 feedbackHtml = `
+                    <div style="font-weight: bold; font-size: 1.1em; color: var(--mario-green);">太棒了！你的防災知識很棒！</div>
+                    <div id="explanation-text">
+                        <strong>說明:</strong> ${explanationTextZh}<br>
+                        <span style="color: #666; font-size: 0.9em;"><strong>Explanation:</strong> ${explanationTextEn}</span>
+                    </div>
+                `;
+            } else {
+                feedbackHtml = `
+                    <div style="font-weight: bold; font-size: 1.1em; color: var(--mario-red);">
+                        哎呀，錯了。正確答案是：<br>
+                        <span style="color:#000;">${correctAnswerTextZh}</span><br>
+                        <span style="color: #666; font-size: 0.9em;">(${correctAnswerTextEn})</span>
+                    </div>
+                    <div id="explanation-text">
+                        <strong>說明:</strong> ${explanationTextZh}<br>
+                        <span style="color: #666; font-size: 0.9em;"><strong>Explanation:</strong> ${explanationTextEn}</span>
+                    </div>
+                `;
+            }
+
+            feedbackPanel.innerHTML = feedbackHtml;
+            feedbackPanel.style.display = 'block';
+            document.getElementById('next-btn').style.display = 'inline-block';
+        }
+
+        function nextQuestion() {
+            currentQuestion++;
+            if (currentQuestion < totalQuestions) {
+                loadQuestion();
+            } else {
+                endGame();
+            }
+        }
+
+        function endGame() {
+            switchScreen('screen-end');
+            document.getElementById('final-score').innerText = score;
+            
+            const msgZh = document.getElementById('feedback-msg');
+            const msgEn = document.getElementById('feedback-msg-en');
+            const certArea = document.getElementById('cert-area');
+
+            if (score >= 80) {
+                msgZh.innerText = "太棒了！你已經具備優良的防災知識！";
+                msgEn.innerText = "Awesome! You have excellent safety knowledge!";
+                certArea.style.display = 'block';
+                document.getElementById('cert-score').innerText = score;
+            } else if (score >= 60) {
+                msgZh.innerText = "做得好！但還有進步的空間，要再複習一下喔！";
+                msgEn.innerText = "Good job! But there is room for improvement. Review it again!";
+                certArea.style.display = 'none';
+            } else {
+                msgZh.innerText = "哎呀！地震知識還不夠，多練習幾次吧！";
+                msgEn.innerText = "Oops! You need more practice on safety knowledge!";
+                certArea.style.display = 'none';
+            }
+        }
+
+        function resetGame() {
+            switchScreen('screen-start');
+        }
+
+        // --- 證書下載功能 ---
+        function downloadImage() {
+            const cert = document.getElementById('certificate');
+            if(!cert || typeof html2canvas === 'undefined') return alert('載入截圖套件失敗，請確認網路連線。');
+            html2canvas(cert, { scale: 2 }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = 'earthquake_safety_certificate.jpeg';
+                link.href = canvas.toDataURL('image/jpeg', 0.9);
+                link.click();
+            });
+        }
+
+        function downloadPDF() {
+            const cert = document.getElementById('certificate');
+            if(!cert || typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined') return alert('載入 PDF 套件失敗，請確認網路連線。');
+            html2canvas(cert, { scale: 2 }).then(canvas => {
+                const imgData = canvas.toDataURL('image/png');
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF('landscape', 'mm', 'a4');
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                const yPos = (pdf.internal.pageSize.getHeight() - pdfHeight) / 2;
+                pdf.addImage(imgData, 'PNG', 0, yPos, pdfWidth, pdfHeight);
+                pdf.save('earthquake_safety_certificate.pdf');
+            });
+        }
+    </script>
+
+</body>
+</html>
